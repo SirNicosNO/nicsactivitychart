@@ -1,2 +1,0 @@
-# nicsactivitychart
-Nics Activity Chart
