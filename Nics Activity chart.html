@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Nic's Chart">
+<title>Nic's Activity Chart</title>
+<style>
+  :root{
+    --dyp:      #0A2E3B;
+    --sjo:      #123F4E;
+    --sjo-lys:  #1E5C6E;
+    --skum:     #F2F6F3;
+    --skum-dus: #B9CBC9;
+    --sand:     #C9A86A;
+    --varsko:   #E4572E;
+    --rolig:    #6FB6A8;
+    --linje:    rgba(242,246,243,0.14);
+    --gronn:    #3CE07A;
+    --rod:      #FF5B54;
+  }
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    scroll-behavior: smooth;
+    margin:0; padding:0;
+    background:
+      radial-gradient(ellipse 120% 40% at 50% -10%, var(--sjo-lys) 0%, var(--sjo) 55%, var(--dyp) 100%);
+    color:var(--skum);
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    -webkit-user-select:none; user-select:none;
+  }
+  .display{ font-family: Georgia, "Iowan Old Style", "Palatino", serif; font-weight:400; }
+
+  #app{
+    min-height:100dvh;
+    padding: max(22px, env(safe-area-inset-top)) 18px max(28px, env(safe-area-inset-bottom));
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  #layout{
+    display:grid;
+    grid-template-columns: 190px 1fr;
+    gap: 20px;
+    align-items:start;
+  }
+  @media (max-width: 680px){
+    #layout{ grid-template-columns: 1fr; }
+    .sidebar-col{ order:-1; }
+  }
+
+  .sidebar-col{ margin-top:22px; }
+
+  #sidebar{
+    position:sticky; top:16px;
+    background: rgba(242,246,243,0.05);
+    border: 1px solid var(--linje);
+    border-radius:20px;
+    padding:16px 14px;
+  }
+  .sb-anbefaling{
+    font-size:14.5px; line-height:1.4; margin-bottom:14px; color:var(--skum);
+  }
+  .sb-anbefaling b{ color: var(--gronn); }
+  .sb-liste{ display:flex; flex-direction:column; gap:8px; }
+  @media (max-width: 680px){
+    .sb-liste{ flex-direction:row; flex-wrap:wrap; }
+  }
+  .sb-item{
+    display:flex; align-items:center; gap:9px;
+    padding:9px 10px;
+    border-radius:13px;
+    background: rgba(242,246,243,0.04);
+    border:1px solid var(--linje);
+    opacity:0.45;
+    transition: opacity 0.3s, background 0.3s, border-color 0.3s, transform 0.15s;
+    text-decoration:none;
+    color:inherit;
+    cursor:pointer;
+  }
+  .sb-item:active{ transform: scale(0.97); }
+  .sb-item.gronn{
+    opacity:1;
+    background: rgba(60,224,122,0.14);
+    border-color: rgba(60,224,122,0.5);
+  }
+  .sb-item .emoji{ font-size:18px; }
+  .sb-item .navn{ font-size:13px; font-weight:600; }
+  .sb-item .prikk{
+    width:8px; height:8px; border-radius:50%; margin-left:auto;
+    background:#55636a; flex-shrink:0;
+  }
+  .sb-item.gronn .prikk{ background: var(--gronn); box-shadow: 0 0 6px 1px rgba(60,224,122,0.8); }
+
+  header{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom: 6px; padding: 0 4px;}
+  .stedsnavn{ font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--sand); font-weight: 600; }
+  .klokke{ font-size: 13px; color: var(--skum-dus); font-variant-numeric: tabular-nums; }
+
+  /* ---------- SEKSJON ---------- */
+  .seksjon{ margin-top:22px; }
+  .seksjon-header{
+    display:flex; align-items:center; gap:10px;
+    padding: 0 6px 10px;
+  }
+  .seksjon-header .emoji{ font-size:22px; }
+  .seksjon-header .navn{ font-size:18px; font-weight:600; }
+  .seksjon-header .sted{ font-size:12.5px; color:var(--skum-dus); margin-left:auto; }
+
+  .hero{
+    position:relative;
+    padding: 22px 20px 18px;
+    border-radius: 24px;
+    background: linear-gradient(160deg, rgba(242,246,243,0.09), rgba(242,246,243,0.02));
+    border: 1px solid var(--linje);
+    overflow:hidden;
+  }
+  .fyrlys{
+    position:absolute; top:-40px; right:-40px; width:130px; height:130px;
+    border-radius:50%;
+    background: radial-gradient(circle, rgba(201,168,106,0.4), rgba(201,168,106,0) 70%);
+    filter: blur(2px);
+    animation: sveip 5s ease-in-out infinite;
+  }
+  @keyframes sveip{ 0%,100%{ opacity:0.35; transform:scale(0.9);} 50%{ opacity:0.9; transform:scale(1.08);} }
+
+  .hero-topp{ display:flex; justify-content:space-between; align-items:flex-start; position:relative; z-index:1; }
+  .voff-label{ font-size:12.5px; color:var(--skum-dus); letter-spacing:0.08em; text-transform:uppercase; }
+  .oppdatert{ font-size:11.5px; color:var(--skum-dus); text-align:right; }
+
+  .verdi-rad{ display:flex; align-items:flex-end; gap:12px; margin-top: 4px; position:relative; z-index:1; }
+  .verdi-tall{ font-size: 74px; line-height:0.85; letter-spacing:-0.02em; }
+  .verdi-enhet{ font-size:21px; color: var(--skum-dus); padding-bottom:8px; }
+  .tilstand{ margin-top:8px; font-size:15px; color: var(--skum); position:relative; z-index:1; }
+  .tilstand b{ color: var(--sand); font-weight:600; }
+  .hero-ekstra{
+    display:flex; flex-direction:column; align-items:flex-end; gap:5px;
+    margin-left:auto; align-self:flex-start;
+    font-size:15px; color: var(--skum-dus);
+    position:relative; z-index:1;
+  }
+  .hero-ekstra:empty{ display:none; }
+  .hero-ekstra .del{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  .hero-ekstra .ikon{ font-size:20px; line-height:1; width:auto; text-align:center; flex-shrink:0; }
+
+  /* ---------- STATUSLYS: tydelig rødt/grønt ---------- */
+  .status-pille{
+    position:relative; z-index:1;
+    display:inline-flex; align-items:center; gap:11px;
+    margin-top:15px;
+    padding:10px 16px 10px 12px;
+    border-radius:999px;
+    width:fit-content;
+    transition: background 0.35s, border-color 0.35s;
+    border: 1.5px solid transparent;
+  }
+  .status-lys{
+    width:16px; height:16px; border-radius:50%;
+    background: #55636a;
+    flex-shrink:0;
+    transition: background 0.35s, box-shadow 0.35s;
+  }
+  .status-lys.gronn{
+    background: var(--gronn);
+    box-shadow: 0 0 9px 2px rgba(60,224,122,0.9), 0 0 26px 7px rgba(60,224,122,0.5);
+    animation: puls-gronn 1.8s ease-in-out infinite;
+  }
+  .status-lys.rod{
+    background: var(--rod);
+    box-shadow: 0 0 9px 2px rgba(255,91,84,0.9), 0 0 26px 7px rgba(255,91,84,0.45);
+  }
+  @keyframes puls-gronn{
+    0%,100%{ box-shadow: 0 0 9px 2px rgba(60,224,122,0.9), 0 0 26px 7px rgba(60,224,122,0.5); }
+    50%{ box-shadow: 0 0 12px 4px rgba(60,224,122,1), 0 0 34px 11px rgba(60,224,122,0.65); }
+  }
+  .status-tekst{ font-size:14px; color:var(--skum); font-weight:600; }
+  .status-pille.aktiv{ background: rgba(60,224,122,0.14); border-color: rgba(60,224,122,0.55); }
+  .status-pille.inaktiv{ background: rgba(255,91,84,0.12); border-color: rgba(255,91,84,0.4); }
+
+  /* ---------- DETALJER ---------- */
+  .grid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:14px; }
+  .kort{
+    background: rgba(242,246,243,0.05);
+    border: 1px solid var(--linje);
+    border-radius:16px;
+    padding:13px 15px;
+  }
+  .kort .k-label{ font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--skum-dus); }
+  .kort .k-verdi{ font-size:22px; margin-top:5px; font-family: Georgia, serif; }
+  .kort .k-sub{ font-size:12px; color:var(--skum-dus); margin-top:2px; }
+  .retningspil{ display:inline-block; margin-right:6px; transition: transform 0.4s; }
+
+  /* ---------- DAGSVARSEL ---------- */
+  .dager-tittel{ margin: 16px 0 8px 6px; font-size:12px; letter-spacing:0.09em; text-transform:uppercase; color:var(--skum-dus); }
+  .dager{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .dager::-webkit-scrollbar{ display:none; }
+  .dag{
+    flex:1 0 auto; min-width:72px;
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    padding:12px 6px 11px;
+    border-radius:16px;
+    background: rgba(242,246,243,0.045);
+    border:1px solid var(--linje);
+  }
+  .dag .d-navn{ font-size:12.5px; color:var(--skum-dus); text-transform:capitalize; }
+  .dag .d-symbol{ font-size:18px; line-height:1; }
+  .dag .d-lys{
+    width:11px; height:11px; border-radius:50%;
+    background:#55636a;
+  }
+  .dag .d-lys.gronn{ background: var(--gronn); box-shadow: 0 0 7px 1px rgba(60,224,122,0.8); }
+  .dag .d-lys.rod{ background: var(--rod); box-shadow: 0 0 7px 1px rgba(255,91,84,0.7); }
+  .dag .d-verdi{ font-size:15.5px; font-weight:600; }
+  .dag .d-vind{ font-size:10.5px; color:var(--skum-dus); margin-top:-2px; }
+  .dag .d-retning{ font-size:10.5px; color:var(--skum-dus); }
+
+  .feilboks{
+    margin-top:14px; padding:14px 16px; border-radius:14px;
+    background: rgba(228,87,46,0.12); border:1px solid rgba(228,87,46,0.35);
+    font-size:13.5px; line-height:1.5;
+  }
+  .feilboks a{ color:var(--sand); }
+  .skjult{ display:none !important; }
+
+  footer{ margin-top:26px; padding-top:8px; text-align:center; }
+  footer a{ color: var(--skum-dus); font-size:11.5px; text-decoration:none; border-bottom:1px solid var(--linje); }
+
+  @media (prefers-reduced-motion: reduce){ .fyrlys{ animation:none; } }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="stedsnavn display">Nic's Activity Chart</div>
+    <div class="klokke" id="klokke">—</div>
+  </header>
+
+  <div id="layout">
+    <div class="sidebar-col">
+      <div class="seksjon-header">
+        <span class="emoji">🎯</span>
+        <span class="navn">I dag</span>
+      </div>
+      <div id="sidebar">
+        <div class="sb-anbefaling" id="sb-anbefaling">Sjekker forholdene …</div>
+        <div class="sb-liste" id="sb-liste"></div>
+      </div>
+    </div>
+    <div id="seksjoner"></div>
+  </div>
+
+  <footer>
+    <a href="https://www.yr.no/nb/v%C3%A6rvarsel/kart/2-3138073/Norge/M%C3%B8re%20og%20Romsdal/Giske/Alnes" target="_blank">Data fra Open-Meteo (NOAA GFS) · Alnes & Vigra</a>
+  </footer>
+
+</div>
+
+<template id="seksjon-mal">
+  <div class="seksjon">
+    <div class="seksjon-header">
+      <span class="emoji"></span>
+      <span class="navn"></span>
+      <span class="sted"></span>
+    </div>
+    <div class="hero">
+      <div class="fyrlys"></div>
+      <div class="hero-topp">
+        <div class="voff-label"></div>
+        <div class="oppdatert">henter data …</div>
+      </div>
+      <div class="verdi-rad">
+        <div class="verdi-tall display">–</div>
+        <div class="verdi-enhet"></div>
+        <div class="hero-ekstra"></div>
+      </div>
+      <div class="tilstand">Henter varsel …</div>
+      <div class="status-pille">
+        <div class="status-lys"></div>
+        <div class="status-tekst">Sjekker forholdene …</div>
+      </div>
+    </div>
+    <div class="grid"></div>
+    <div class="dager-tittel">Neste dager</div>
+    <div class="dager"></div>
+    <div class="feilboks skjult">
+      Fikk ikke hentet ferske data for denne kategorien akkurat nå.
+    </div>
+  </div>
+</template>
+
+<script>
+(function(){
+  const STEDER = {
+    alnes: { lat: 62.4899, lon: 5.9674, navn: 'Alnes' },
+    vigra: { lat: 62.5606, lon: 6.1138, navn: 'Vigra' },
+    orsta: { lat: 62.1975, lon: 6.1319, navn: 'Ørsta' },
+    sulafjellet: { lat: 62.4250, lon: 6.1050, navn: 'Sulafjellet' },
+    valderoya: { lat: 62.4930, lon: 6.0450, navn: 'Valderøya' },
+    hoven: { lat: 61.8580, lon: 6.8580, navn: 'Hoven, Loen' },
+  };
+
+  const KATEGORIER = [
+    {
+      id: 'surfing', emoji: '🌊', navn: 'Surfing', sted: 'alnes',
+      heroLabel: 'Bølgehøyde (signifikant)', enhet: 'meter', desimaler: 1,
+      terskel: { min: 1.0, maks: Infinity },
+      retninger: null, retningTekst: null,
+    },
+    {
+      id: 'kiting', emoji: '🪁', navn: 'Kiting', sted: 'vigra',
+      heroLabel: 'Vindstyrke', enhet: 'm/s', desimaler: 1,
+      terskel: { min: 5, maks: 14 },
+      retninger: null, retningTekst: null,
+    },
+    {
+      id: 'heng', emoji: '🪂', navn: 'Hengflyging', sted: 'alnes',
+      heroLabel: 'Vindstyrke', enhet: 'm/s', desimaler: 1,
+      terskel: { min: 4, maks: 12 },
+      retninger: ['NV','NNV','N','NNØ','NØ'], retningTekst: 'nordlig retning',
+      krevIkkeRegn: true,
+    },
+    {
+      id: 'hikefly', emoji: '🥾', navn: 'Hike & Fly', sted: 'orsta',
+      heroLabel: 'Skybase (estimert)', enhet: 'm', desimaler: 0,
+      terskel: { min: 1000, maks: Infinity },
+      retninger: null, retningTekst: null,
+      krevIkkeRegn: true,
+      vindHoydeMaks: 6,
+      visHoydevind: true,
+    },
+    {
+      id: 'paragliding', emoji: '🪂', navn: 'Paragliding', sted: 'sulafjellet',
+      heroLabel: 'Skybase (estimert)', enhet: 'm', desimaler: 0,
+      terskel: { min: 1000, maks: Infinity },
+      retninger: null, retningTekst: null,
+      krevIkkeRegn: true,
+      vindHoydeMin: 4, vindHoydeMaks: 7,
+      vindHoydeRetninger: ['N'],
+      visHoydevind: true,
+    },
+    {
+      id: 'mtb', emoji: '🚵', navn: 'Mountain Biking', sted: 'valderoya',
+      heroLabel: 'Temperatur', enhet: '°', desimaler: 1,
+      terskel: { min: 12, maks: Infinity },
+      retninger: null, retningTekst: null,
+      krevIkkeRegn: true,
+      krevTorrTerreng: true,
+      vindHoydeMaks: 7,
+    },
+    {
+      id: 'speedflying', emoji: '🚀', navn: 'Speedflying', sted: 'hoven',
+      heroLabel: 'Skybase (estimert)', enhet: 'm', desimaler: 0,
+      terskel: { min: 1011, maks: Infinity },
+      retninger: null, retningTekst: null,
+      krevIkkeRegn: true,
+      vindHoydeMaks: 6,
+      vindHoydeRetninger: ['Ø','ØSØ','SØ','SSØ','S','SSV','SV','VSV','V'],
+      vindHoydeRetningEtikett: 'Ø via S til V',
+      visHoydevind: true,
+    },
+  ];
+
+  function gradTilKompass(g){
+    const retninger = ['N','NNØ','NØ','ØNØ','Ø','ØSØ','SØ','SSØ','S','SSV','SV','VSV','V','VNV','NV','NNV'];
+    return retninger[Math.round(g/22.5) % 16];
+  }
+
+  function vaerSymbol(kode){
+    if(kode == null) return '–';
+    if(kode === 0) return '☀️';
+    if(kode <= 2) return '🌤️';
+    if(kode === 3) return '☁️';
+    if(kode === 45 || kode === 48) return '🌫️';
+    if(kode >= 51 && kode <= 57) return '🌦️';
+    if(kode >= 61 && kode <= 67) return '🌧️';
+    if(kode >= 71 && kode <= 77) return '🌨️';
+    if(kode >= 80 && kode <= 82) return '🌧️';
+    if(kode === 85 || kode === 86) return '🌨️';
+    if(kode >= 95) return '⛈️';
+    return '☁️';
+  }
+
+  function heroEkstraDel(ikon, tekst){
+    return `<span class="del"><span class="ikon">${ikon}</span>${tekst}</span>`;
+  }
+
+  function vaerTekst(kode){
+    if(kode == null) return '';
+    if(kode === 0) return 'Klarvær';
+    if(kode <= 2) return 'Delvis skyet';
+    if(kode === 3) return 'Skyet';
+    if(kode === 45 || kode === 48) return 'Tåke';
+    if(kode >= 51 && kode <= 57) return 'Yr';
+    if(kode >= 61 && kode <= 67) return 'Regn';
+    if(kode >= 71 && kode <= 77) return 'Snø';
+    if(kode >= 80 && kode <= 82) return 'Regnbyger';
+    if(kode === 85 || kode === 86) return 'Snøbyger';
+    if(kode >= 95) return 'Torden';
+    return 'Skyet';
+  }
+
+  function oppdaterKlokke(){
+    document.getElementById('klokke').textContent = new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'});
+  }
+  oppdaterKlokke();
+  setInterval(oppdaterKlokke, 30000);
+
+  // ---------- Bygg DOM for hver seksjon ----------
+  const mal = document.getElementById('seksjon-mal');
+  const container = document.getElementById('seksjoner');
+  const els = {};
+
+  KATEGORIER.forEach(kat => {
+    const node = mal.content.cloneNode(true);
+    const seksjon = node.querySelector('.seksjon');
+    seksjon.id = 'seksjon-' + kat.id;
+
+    seksjon.querySelector('.emoji').textContent = kat.emoji;
+    seksjon.querySelector('.navn').textContent = `${kat.navn} - ${STEDER[kat.sted].navn}`;
+    seksjon.querySelector('.sted').remove();
+    seksjon.querySelector('.voff-label').textContent = kat.heroLabel;
+    seksjon.querySelector('.verdi-enhet').textContent = kat.enhet;
+
+    if(kat.id === 'surfing'){
+      seksjon.querySelector('.grid').innerHTML = `
+        <div class="kort"><div class="k-label">Bølgeperiode</div><div class="k-verdi" data-f="periode">–</div><div class="k-sub">sekunder mellom topper</div></div>
+        <div class="kort"><div class="k-label">Bølgeretning</div><div class="k-verdi"><span class="retningspil" data-f="pil">↑</span><span data-f="retning">–</span></div><div class="k-sub" data-f="retning-tekst">kommer fra</div></div>
+        <div class="kort"><div class="k-label">Vind</div><div class="k-verdi" data-f="vind">–</div><div class="k-sub" data-f="vind-retning">–</div></div>
+        <div class="kort"><div class="k-label">Sjøtemperatur</div><div class="k-verdi" data-f="sjotemp">–</div><div class="k-sub">ved overflaten</div></div>
+      `;
+    } else if(kat.id === 'hikefly' || kat.id === 'paragliding' || kat.id === 'mtb' || kat.id === 'speedflying'){
+      // Vind og vær vises i selve hero-boksen (hero-ekstra) for disse to —
+      // ingen småkort under, for å spare plass.
+      seksjon.querySelector('.grid').classList.add('skjult');
+      let vindKrav;
+      if(kat.vindHoydeRetninger){
+        const retningTxt = kat.vindHoydeRetningEtikett || kat.vindHoydeRetninger.join('/');
+        vindKrav = `${kat.vindHoydeMin != null ? kat.vindHoydeMin : 0}–${kat.vindHoydeMaks} m/s fra ${retningTxt}`;
+      } else {
+        vindKrav = `må være under ${kat.vindHoydeMaks} m/s`;
+      }
+      seksjon.querySelector('.grid').innerHTML = `
+        <div class="kort"><div class="k-label">Vind på 1000 moh</div><div class="k-verdi" data-f="vindhoyde">–</div><div class="k-sub">${vindKrav}</div></div>
+        <div class="kort"><div class="k-label">Vær nå</div><div class="k-verdi" data-f="vaersymbol">–</div><div class="k-sub">må være tørt for grønt lys</div></div>
+      `;
+    } else {
+      seksjon.querySelector('.grid').innerHTML = `
+        <div class="kort"><div class="k-label">Vindretning</div><div class="k-verdi"><span class="retningspil" data-f="pil">↑</span><span data-f="retning">–</span></div><div class="k-sub" data-f="retning-tekst">kommer fra</div></div>
+        <div class="kort"><div class="k-label">Vindkast</div><div class="k-verdi" data-f="vindkast">–</div><div class="k-sub">høyeste kast nå</div></div>
+      `;
+    }
+
+    container.appendChild(node);
+  });
+
+  KATEGORIER.forEach(kat => {
+    const s = document.getElementById('seksjon-' + kat.id);
+    els[kat.id] = {
+      oppdatert: s.querySelector('.oppdatert'),
+      verdiTall: s.querySelector('.verdi-tall'),
+      tilstand: s.querySelector('.tilstand'),
+      heroEkstra: s.querySelector('.hero-ekstra'),
+      statusPille: s.querySelector('.status-pille'),
+      statusLys: s.querySelector('.status-lys'),
+      statusTekst: s.querySelector('.status-tekst'),
+      dager: s.querySelector('.dager'),
+      feilboks: s.querySelector('.feilboks'),
+      f: {},
+    };
+    s.querySelectorAll('[data-f]').forEach(el => {
+      els[kat.id].f[el.dataset.f] = el;
+    });
+  });
+
+  // ---------- Beskrivelser ----------
+  function tilstandBolge(h, kat){
+    if(h == null) return {tekst:"Ingen data tilgjengelig akkurat nå.", farge:'var(--skum-dus)'};
+    if(h < 0.3) return {tekst:"Flatt som et bordtennisbord. Surfing er rett og slett umulig i dag.", farge:'var(--varsko)'};
+    if(h < kat.terskel.min) return {tekst:"For puslete bølger til å stå på. La brettet henge på veggen i dag.", farge:'var(--varsko)'};
+    if(h < 1.5) return {tekst:"Nå er det perfekte bølger! Kom deg i drakta! 🤙", farge:'var(--sand)'};
+    if(h < 2.5) return {tekst:"Solid swell inn! Dette er dagen du har ventet på.", farge:'var(--sand)'};
+    return {tekst:"Storm-sjø! Kun for de virkelig erfarne der ute.", farge:'var(--varsko)'};
+  }
+  function tilstandVind(v, kat){
+    if(v == null) return {tekst:"Ingen data tilgjengelig akkurat nå.", farge:'var(--skum-dus)'};
+    if(kat.id === 'kiting'){
+      if(v < 3) return {tekst:"Dødt vindstille. Kiting er rett og slett umulig i dag.", farge:'var(--varsko)'};
+      if(v < kat.terskel.min) return {tekst:"For slapt for å holde skjermen oppe. Ikke i dag.", farge:'var(--varsko)'};
+      if(v <= kat.terskel.maks) return {tekst:"Perfekt trykk i skjermen! På tide å rigge! 🪁", farge:'var(--sand)'};
+      return {tekst:"For kraftig vind til å holde kontroll. Ikke sikkert nok til å kite i dag.", farge:'var(--varsko)'};
+    }
+    // hengflyging
+    if(v < 3) return {tekst:"Nesten blikkstille. Ingen løft å hente — ikke flyvær i dag.", farge:'var(--varsko)'};
+    if(v < kat.terskel.min) return {tekst:"For lite løft ennå. Sekken blir liggende i dag.", farge:'var(--varsko)'};
+    if(v <= kat.terskel.maks) return {tekst:"Drømmeforhold i lufta! Klart for start! 🪂", farge:'var(--sand)'};
+    return {tekst:"For kraftig vind til trygg flyging. Hold deg på bakken i dag.", farge:'var(--varsko)'};
+  }
+
+  const statusNaa = { surfing: null, kiting: null, heng: null, hikefly: null, paragliding: null, mtb: null, speedflying: null };
+
+  function sjekkOppfylt(verdi, kompass, kat, ekstra){
+    ekstra = ekstra || {};
+    const iStyrke = (verdi != null) && verdi >= kat.terskel.min && verdi <= kat.terskel.maks;
+    const iRetning = (kat.retninger == null) || (kompass != null && kat.retninger.includes(kompass));
+    const iRegn = !(kat.krevIkkeRegn && ekstra.regner);
+    const iTerreng = !(kat.krevTorrTerreng && ekstra.terrengVaat);
+    const vindMin = kat.vindHoydeMin != null ? kat.vindHoydeMin : -Infinity;
+    const vindMaks = kat.vindHoydeMaks != null ? kat.vindHoydeMaks : Infinity;
+    const iVindHoyde = (kat.vindHoydeMin == null && kat.vindHoydeMaks == null)
+      || (ekstra.vindHoyde != null && ekstra.vindHoyde >= vindMin && ekstra.vindHoyde <= vindMaks);
+    const iVindHoydeRetning = (kat.vindHoydeRetninger == null)
+      || (ekstra.vindHoydeRetning != null && kat.vindHoydeRetninger.includes(ekstra.vindHoydeRetning));
+    return iStyrke && iRetning && iRegn && iTerreng && iVindHoyde && iVindHoydeRetning;
+  }
+
+  function oppdaterSidebar(){
+    const alleLastet = KATEGORIER.every(k => statusNaa[k.id] !== null);
+    const gronne = KATEGORIER.filter(k => statusNaa[k.id] === true);
+
+    const liste = document.getElementById('sb-liste');
+    liste.innerHTML = '';
+    KATEGORIER.forEach(kat => {
+      const st = statusNaa[kat.id];
+      const a = document.createElement('a');
+      a.href = '#seksjon-' + kat.id;
+      a.className = 'sb-item' + (st === true ? ' gronn' : '');
+      a.innerHTML = `<span class="emoji">${kat.emoji}</span><span class="navn">${kat.navn}</span><span class="prikk"></span>`;
+      a.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        document.getElementById('seksjon-' + kat.id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      liste.appendChild(a);
+    });
+
+    const anbefaling = document.getElementById('sb-anbefaling');
+    anbefaling.innerHTML = 'I dag anbefales:';
+  }
+
+  function oppdaterStatuslys(e, verdi, kompass, kat, ekstra){
+    ekstra = ekstra || {};
+    e.statusPille.classList.remove('aktiv','inaktiv');
+    e.statusLys.classList.remove('gronn','rod');
+
+    if(verdi == null){
+      e.statusTekst.textContent = 'Ingen data akkurat nå';
+      statusNaa[kat.id] = null;
+      oppdaterSidebar();
+      return;
+    }
+    const oppfylt = sjekkOppfylt(verdi, kompass, kat, ekstra);
+    statusNaa[kat.id] = oppfylt;
+    oppdaterSidebar();
+
+    if(oppfylt){
+      e.statusLys.classList.add('gronn');
+      e.statusPille.classList.add('aktiv');
+      const retningsdel = kat.retningTekst ? ` fra ${kompass}` : '';
+      e.statusTekst.innerHTML = `${verdi.toFixed(kat.desimaler != null ? kat.desimaler : 1)} ${kat.enhet}${retningsdel} — gode forhold`;
+    } else {
+      e.statusLys.classList.add('rod');
+      e.statusPille.classList.add('inaktiv');
+      const iStyrke = verdi >= kat.terskel.min && verdi <= kat.terskel.maks;
+      const iRetning = (kat.retninger == null) || (kompass != null && kat.retninger.includes(kompass));
+      const vindMin = kat.vindHoydeMin != null ? kat.vindHoydeMin : -Infinity;
+      const vindMaks = kat.vindHoydeMaks != null ? kat.vindHoydeMaks : Infinity;
+      const iVindHoyde = (kat.vindHoydeMin == null && kat.vindHoydeMaks == null)
+        || (ekstra.vindHoyde != null && ekstra.vindHoyde >= vindMin && ekstra.vindHoyde <= vindMaks);
+      const iVindHoydeRetning = (kat.vindHoydeRetninger == null)
+        || (ekstra.vindHoydeRetning != null && kat.vindHoydeRetninger.includes(ekstra.vindHoydeRetning));
+      if(kat.krevIkkeRegn && ekstra.regner){
+        e.statusTekst.textContent = 'Det regner — ikke i dag';
+      } else if(kat.krevTorrTerreng && ekstra.terrengVaat){
+        e.statusTekst.textContent = 'Vått i terrenget etter nedbør siste dager';
+      } else if(!iStyrke){
+        e.statusTekst.textContent = `Utenfor ${kat.terskel.min}–${kat.terskel.maks === Infinity ? '∞' : kat.terskel.maks} ${kat.enhet}`;
+      } else if(!iRetning){
+        e.statusTekst.textContent = `Feil retning (${kompass || '–'}) — ønsker ${kat.retningTekst}`;
+      } else if(!iVindHoyde){
+        const grenser = `${kat.vindHoydeMin != null ? kat.vindHoydeMin : 0}–${kat.vindHoydeMaks}`;
+        e.statusTekst.textContent = `Vind i høyden utenfor ${grenser} m/s`;
+      } else if(!iVindHoydeRetning){
+        e.statusTekst.textContent = `Feil vindretning i høyden (${ekstra.vindHoydeRetning || '–'})`;
+      } else {
+        e.statusTekst.textContent = 'Ikke i dag';
+      }
+    }
+  }
+
+  function byggDagsvarsel(e, dager, kat){
+    e.dager.innerHTML = '';
+    dager.forEach(d => {
+      const oppfylt = sjekkOppfylt(d.verdi, d.kompass, kat, { regner: d.regner, vindHoyde: d.vindHoyde, vindHoydeRetning: d.vindRetning, terrengVaat: d.terrengVaat });
+      const lysKlasse = d.verdi == null ? '' : (oppfylt ? 'gronn' : 'rod');
+      const navn = d.dato.toLocaleDateString('nb-NO', {weekday:'short'});
+      const symbolHtml = kat.krevIkkeRegn ? `<div class="d-symbol">${vaerSymbol(d.vaerkode)}</div>` : '';
+      const enhetSuffix = kat.visHoydevind ? ' ' + kat.enhet : '';
+      const vindHtml = kat.visHoydevind && d.vindHoyde != null
+        ? `<div class="d-vind">${d.vindHoyde.toFixed(1)} m/s${d.vindRetning ? ' ' + d.vindRetning : ''}</div>`
+        : '';
+      const retningHtml = kat.visHoydevind ? '' : `<div class="d-retning">${d.kompass || ''}</div>`;
+      const div = document.createElement('div');
+      div.className = 'dag';
+      div.innerHTML = `
+        <div class="d-navn">${navn}</div>
+        ${symbolHtml}
+        <div class="d-lys ${lysKlasse}"></div>
+        <div class="d-verdi">${d.verdi != null ? d.verdi.toFixed(kat.desimaler != null ? kat.desimaler : 1) + enhetSuffix : '–'}</div>
+        ${vindHtml}
+        ${retningHtml}
+      `;
+      e.dager.appendChild(div);
+    });
+  }
+
+  // ---------- Datahenting ----------
+  async function hentJson(url){
+    const svar = await fetch(url);
+    if(!svar.ok) throw new Error('HTTP ' + svar.status);
+    return svar.json();
+  }
+
+  async function hentBolgedata(sted){
+    const p = STEDER[sted];
+    const base = `https://marine-api.open-meteo.com/v1/marine?latitude=${p.lat}&longitude=${p.lon}`
+      + `&current=wave_height,wave_direction,wave_period`
+      + `&daily=wave_height_max,wave_direction_dominant`
+      + `&forecast_days=7&timezone=auto`;
+    // ECMWF WAM er modellen Windy bruker som standard — prøv den først
+    try{
+      const data = await hentJson(base + `&models=ecmwf_wam025`);
+      if(data.current && data.current.wave_height != null) return data;
+      throw new Error('Tom verdi fra ECMWF WAM');
+    }catch(e){
+      console.warn('ECMWF WAM ga ingen data, prøver GFS Wave i stedet:', e);
+      return hentJson(base + `&models=ncep_gfswave025`);
+    }
+  }
+
+  async function hentSjotemp(sted){
+    const p = STEDER[sted];
+    const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${p.lat}&longitude=${p.lon}`
+      + `&current=sea_surface_temperature&timezone=auto`;
+    return hentJson(url);
+  }
+
+  async function hentVinddata(sted){
+    const p = STEDER[sted];
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}`
+      + `&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation,weather_code`
+      + `&daily=wind_speed_10m_max,wind_direction_10m_dominant,precipitation_sum,weather_code`
+      + `&wind_speed_unit=ms&forecast_days=7&timezone=auto`;
+    return hentJson(url);
+  }
+
+  function lagDagerFraDaglig(daily, verdiNokkel, retningNokkel){
+    const dager = [];
+    const naa = new Date(); naa.setHours(0,0,0,0);
+    for(let i = 0; i < daily.time.length; i++){
+      const dato = new Date(daily.time[i]);
+      if(dato < naa) continue;
+      const verdi = daily[verdiNokkel] ? daily[verdiNokkel][i] : null;
+      const retningGrad = retningNokkel && daily[retningNokkel] ? daily[retningNokkel][i] : null;
+      const nedbor = daily.precipitation_sum ? daily.precipitation_sum[i] : null;
+      const vaerkode = daily.weather_code ? daily.weather_code[i] : null;
+      dager.push({
+        dato,
+        verdi,
+        kompass: retningGrad != null ? gradTilKompass(retningGrad) : null,
+        regner: nedbor != null ? nedbor > 0 : false,
+        vaerkode,
+      });
+    }
+    return dager.slice(0, 7);
+  }
+
+  async function visSurfing(kat){
+    const e = els[kat.id];
+    try{
+      const data = await hentBolgedata('alnes');
+      const naa = data.current;
+      const h = naa.wave_height;
+      const periode = naa.wave_period;
+      const retning = naa.wave_direction;
+      const kompass = retning != null ? gradTilKompass(retning) : null;
+
+      e.verdiTall.textContent = (h != null) ? h.toFixed(1) : '–';
+      const t = tilstandBolge(h, kat);
+      e.tilstand.innerHTML = t.tekst;
+      e.verdiTall.style.color = t.farge;
+      e.f.periode.textContent = (periode != null) ? periode.toFixed(1) + ' s' : '–';
+      if(retning != null){
+        e.f.retning.textContent = kompass;
+        e.f['retning-tekst'].textContent = 'fra ' + Math.round(retning) + '°';
+        e.f.pil.style.transform = `rotate(${retning + 180}deg)`;
+      }
+
+      oppdaterStatuslys(e, h, kompass, kat, {});
+      byggDagsvarsel(e, lagDagerFraDaglig(data.daily, 'wave_height_max', 'wave_direction_dominant'), kat);
+
+      e.oppdatert.textContent = 'oppdatert ' + new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'});
+      e.feilboks.classList.add('skjult');
+
+      hentVinddata('alnes').then(vd => {
+        e.f.vind.textContent = vd.current.wind_speed_10m.toFixed(1) + ' m/s';
+        e.f['vind-retning'].textContent = 'fra ' + gradTilKompass(vd.current.wind_direction_10m);
+      }).catch(()=>{});
+
+      hentSjotemp('alnes').then(sd => {
+        const st = sd.current.sea_surface_temperature;
+        e.f.sjotemp.textContent = (st != null) ? st.toFixed(1) + '°' : '–';
+      }).catch(()=>{});
+
+    }catch(err){
+      console.error('Feil (surfing):', err);
+      visFeil(e, kat);
+    }
+  }
+
+  async function visVindsport(kat){
+    const e = els[kat.id];
+    try{
+      const data = await hentVinddata(kat.sted);
+      const naa = data.current;
+      const v = naa.wind_speed_10m;
+      const retning = naa.wind_direction_10m;
+      const kast = naa.wind_gusts_10m;
+      const regnerNaa = kat.krevIkkeRegn ? (naa.precipitation > 0) : false;
+      const kompass = retning != null ? gradTilKompass(retning) : null;
+
+      e.verdiTall.textContent = (v != null) ? v.toFixed(1) : '–';
+      const t = tilstandVind(v, kat);
+      e.tilstand.innerHTML = t.tekst;
+      e.verdiTall.style.color = t.farge;
+      if(retning != null){
+        e.f.retning.textContent = kompass;
+        e.f['retning-tekst'].textContent = 'fra ' + Math.round(retning) + '°';
+        e.f.pil.style.transform = `rotate(${retning + 180}deg)`;
+      }
+      e.f.vindkast.textContent = (kast != null) ? kast.toFixed(1) + ' m/s' : '–';
+      if(e.f.vaersymbol){
+        e.f.vaersymbol.textContent = vaerSymbol(naa.weather_code);
+      }
+
+      if(e.heroEkstra && kat.krevIkkeRegn){
+        const retningDel = kompass != null
+          ? heroEkstraDel('💨', `fra ${kompass}${kast != null ? ' · kast ' + kast.toFixed(1) + ' m/s' : ''}`)
+          : '';
+        const vaerDel = naa.weather_code != null
+          ? heroEkstraDel(vaerSymbol(naa.weather_code), vaerTekst(naa.weather_code))
+          : '';
+        e.heroEkstra.innerHTML = retningDel + vaerDel;
+      }
+
+      oppdaterStatuslys(e, v, kompass, kat, { regner: regnerNaa });
+      byggDagsvarsel(e, lagDagerFraDaglig(data.daily, 'wind_speed_10m_max', 'wind_direction_10m_dominant'), kat);
+
+      e.oppdatert.textContent = 'oppdatert ' + new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'});
+      e.feilboks.classList.add('skjult');
+
+    }catch(err){
+      console.error('Feil (' + kat.id + '):', err);
+      visFeil(e, kat);
+    }
+  }
+
+  async function hentHikeFlyData(sted){
+    const p = STEDER[sted];
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}`
+      + `&current=temperature_2m,dew_point_2m,wind_speed_900hPa,wind_direction_900hPa,precipitation,weather_code`
+      + `&hourly=temperature_2m,dew_point_2m,wind_speed_900hPa,wind_direction_900hPa,precipitation`
+      + `&daily=precipitation_sum,weather_code`
+      + `&wind_speed_unit=ms&forecast_days=7&timezone=auto`;
+    return hentJson(url);
+  }
+
+  // Enkel tommelfingerregel for skybase: 125 m høyde per grad forskjell mellom
+  // temperatur og duggpunkt (samme prinsipp som paragliding-piloter bruker).
+  function beregnSkybase(temp, duggpunkt){
+    if(temp == null || duggpunkt == null) return null;
+    return 125 * (temp - duggpunkt);
+  }
+
+  function tilstandHikeFly(skybase, vindHoyde, vindRetning, regner, kat){
+    const erParagliding = kat.id === 'paragliding';
+    const erSpeedflying = kat.id === 'speedflying';
+    const aktivitet = erParagliding ? 'paragliding' : (erSpeedflying ? 'speedflying' : 'hike & fly');
+
+    if(skybase == null) return {tekst:"Ingen data tilgjengelig akkurat nå.", farge:'var(--skum-dus)'};
+    if(regner){
+      const tekst = erSpeedflying ? "Det pøsregner — vingen blir i bagen i dag."
+        : erParagliding ? "Det regner — vingen blir liggende i dag."
+        : "Det regner — sett skoene på hylla i dag.";
+      return {tekst, farge:'var(--varsko)'};
+    }
+    if(skybase < kat.terskel.min) return {tekst:`Skyene henger for lavt. Umulig å få nok høyde til ${aktivitet} i dag.`, farge:'var(--varsko)'};
+    if(kat.vindHoydeMaks != null && vindHoyde != null && vindHoyde > kat.vindHoydeMaks) return {tekst:`For mye vind i høyden. Ikke trygt nok til ${aktivitet} i dag.`, farge:'var(--varsko)'};
+    if(kat.vindHoydeMin != null && vindHoyde != null && vindHoyde < kat.vindHoydeMin) return {tekst:"For slapt i høyden ennå — vingen blir liggende urørt i dag.", farge:'var(--varsko)'};
+    if(kat.vindHoydeRetninger != null && vindRetning != null && !kat.vindHoydeRetninger.includes(vindRetning)){
+      return {tekst:`Feil vindretning for takeoff i dag — ${aktivitet} må vente.`, farge:'var(--varsko)'};
+    }
+    if(erSpeedflying) return {tekst:"Klar himmel og perfekt takeoff-vind! Spenn på deg vingen! 🚀", farge:'var(--rolig)'};
+    return erParagliding
+      ? {tekst:"Blå himmel og fint trykk! Bær med vingen opp! 🪂", farge:'var(--rolig)'}
+      : {tekst:"Høy himmel og fine termikker! Snør på sekken! 🥾", farge:'var(--rolig)'};
+  }
+
+  function lagDagerHikeFly(data){
+    const hourly = data.hourly;
+    const daily = data.daily;
+    const dager = [];
+    const naa = new Date(); naa.setHours(0,0,0,0);
+
+    const perDato = {};
+    for(let i = 0; i < hourly.time.length; i++){
+      const dato = hourly.time[i].slice(0,10);
+      if(!perDato[dato]) perDato[dato] = [];
+      perDato[dato].push(i);
+    }
+
+    for(let d = 0; d < daily.time.length; d++){
+      const datoStr = daily.time[d];
+      const dato = new Date(datoStr);
+      if(dato < naa) continue;
+
+      const idxListe = perDato[datoStr] || [];
+      // bruk timen med høyest temperatur den dagen — representerer det beste flyvinduet
+      let besteIdx = null, besteTemp = -Infinity;
+      idxListe.forEach(i => {
+        const temp = hourly.temperature_2m[i];
+        if(temp != null && temp > besteTemp){ besteTemp = temp; besteIdx = i; }
+      });
+
+      let skybase = null, vindHoyde = null, vindRetning = null;
+      if(besteIdx != null){
+        skybase = beregnSkybase(hourly.temperature_2m[besteIdx], hourly.dew_point_2m[besteIdx]);
+        vindHoyde = hourly.wind_speed_900hPa[besteIdx];
+        const grad = hourly.wind_direction_900hPa ? hourly.wind_direction_900hPa[besteIdx] : null;
+        vindRetning = grad != null ? gradTilKompass(grad) : null;
+      }
+
+      dager.push({
+        dato,
+        verdi: skybase,
+        kompass: null,
+        regner: daily.precipitation_sum ? daily.precipitation_sum[d] > 0 : false,
+        vaerkode: daily.weather_code ? daily.weather_code[d] : null,
+        vindHoyde,
+        vindRetning,
+      });
+    }
+    return dager.slice(0, 7);
+  }
+
+  async function visHikeFly(kat){
+    const e = els[kat.id];
+    try{
+      const data = await hentHikeFlyData(kat.sted);
+      const naa = data.current;
+      const skybase = beregnSkybase(naa.temperature_2m, naa.dew_point_2m);
+      const vindHoyde = naa.wind_speed_900hPa;
+      const vindRetning = naa.wind_direction_900hPa != null ? gradTilKompass(naa.wind_direction_900hPa) : null;
+      const regnerNaa = naa.precipitation > 0;
+
+      e.verdiTall.textContent = (skybase != null) ? Math.round(skybase) : '–';
+      const t = tilstandHikeFly(skybase, vindHoyde, vindRetning, regnerNaa, kat);
+      e.tilstand.innerHTML = t.tekst;
+      e.verdiTall.style.color = t.farge;
+
+      if(e.heroEkstra){
+        const pilHtml = naa.wind_direction_900hPa != null
+          ? `<span style="display:inline-block; transform:rotate(${naa.wind_direction_900hPa + 180}deg);">↑</span>`
+          : '💨';
+        const vindDel = vindHoyde != null
+          ? heroEkstraDel(pilHtml, `${vindHoyde.toFixed(1)} m/s${vindRetning ? ' fra ' + vindRetning : ''} (1000 moh)`)
+          : '';
+        const vaerDel = naa.weather_code != null
+          ? heroEkstraDel(vaerSymbol(naa.weather_code), vaerTekst(naa.weather_code))
+          : '';
+        e.heroEkstra.innerHTML = vindDel + vaerDel;
+      }
+
+      if(e.f.vindhoyde) e.f.vindhoyde.textContent = (vindHoyde != null) ? vindHoyde.toFixed(1) + ' m/s' + (vindRetning ? ' ' + vindRetning : '') : '–';
+      if(e.f.vaersymbol) e.f.vaersymbol.textContent = vaerSymbol(naa.weather_code);
+
+      oppdaterStatuslys(e, skybase, null, kat, { regner: regnerNaa, vindHoyde, vindHoydeRetning: vindRetning });
+      byggDagsvarsel(e, lagDagerHikeFly(data), kat);
+
+      e.oppdatert.textContent = 'oppdatert ' + new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'});
+      e.feilboks.classList.add('skjult');
+
+    }catch(err){
+      console.error('Feil (hikefly):', err);
+      visFeil(e, kat);
+    }
+  }
+
+  function visFeil(e, kat){
+    e.oppdatert.textContent = 'kunne ikke oppdatere';
+    e.tilstand.textContent = 'Fikk ikke kontakt med værtjenesten.';
+    e.feilboks.classList.remove('skjult');
+    e.statusTekst.textContent = 'Ingen data akkurat nå';
+    e.statusLys.classList.remove('gronn','rod');
+    e.statusPille.classList.remove('aktiv','inaktiv');
+    if(kat){ statusNaa[kat.id] = null; oppdaterSidebar(); }
+  }
+
+  async function hentMTBData(sted){
+    const p = STEDER[sted];
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}`
+      + `&current=temperature_2m,wind_speed_10m,precipitation,weather_code`
+      + `&daily=precipitation_sum,temperature_2m_max,wind_speed_10m_max,weather_code`
+      + `&wind_speed_unit=ms&past_days=3&forecast_days=7&timezone=auto`;
+    return hentJson(url);
+  }
+
+  function tilstandMTB(temp, vind, regner, terrengVaat, kat){
+    if(temp == null) return {tekst:"Ingen data tilgjengelig akkurat nå.", farge:'var(--skum-dus)'};
+    if(regner) return {tekst:"Det pøsregner. Sykkelen blir stående i dag.", farge:'var(--varsko)'};
+    if(terrengVaat) return {tekst:"Gjørmebad venter. Umulig å kjøre uten å ødelegge stiene i dag.", farge:'var(--varsko)'};
+    if(temp < kat.terskel.min) return {tekst:"For kaldt for en skikkelig økt. Ikke i dag.", farge:'var(--varsko)'};
+    if(vind != null && vind > kat.vindHoydeMaks) return {tekst:"Kastevind på stiene — for hardt for en trygg tur i dag.", farge:'var(--varsko)'};
+    return {tekst:"Tørre stier og perfekt temperatur! Hent frem sykkelen! 🚵", farge:'var(--rolig)'};
+  }
+
+  function lagDagerMTB(daily){
+    const dager = [];
+    const naa = new Date(); naa.setHours(0,0,0,0);
+    for(let i = 3; i < daily.time.length; i++){
+      const dato = new Date(daily.time[i]);
+      if(dato < naa) continue;
+      const p1 = daily.precipitation_sum[i-3], p2 = daily.precipitation_sum[i-2], p3 = daily.precipitation_sum[i-1];
+      const terrengVaat = !(p1 <= 0.1 && p2 <= 0.1 && p3 <= 0.1);
+      dager.push({
+        dato,
+        verdi: daily.temperature_2m_max[i],
+        kompass: null,
+        regner: daily.precipitation_sum[i] > 0.1,
+        vaerkode: daily.weather_code[i],
+        vindHoyde: daily.wind_speed_10m_max[i],
+        terrengVaat,
+      });
+    }
+    return dager.slice(0, 7);
+  }
+
+  async function visMTB(kat){
+    const e = els[kat.id];
+    try{
+      const data = await hentMTBData(kat.sted);
+      const naa = data.current;
+      const temp = naa.temperature_2m;
+      const vind = naa.wind_speed_10m;
+      const regnerNaa = naa.precipitation > 0.1;
+
+      // indeks 0,1,2 i daily-arrayet er de tre dagene FØR i dag (siden past_days=3)
+      const p = data.daily.precipitation_sum;
+      const terrengVaat = !(p[0] <= 0.1 && p[1] <= 0.1 && p[2] <= 0.1);
+
+      e.verdiTall.textContent = (temp != null) ? temp.toFixed(1) : '–';
+      const t = tilstandMTB(temp, vind, regnerNaa, terrengVaat, kat);
+      e.tilstand.innerHTML = t.tekst;
+      e.verdiTall.style.color = t.farge;
+
+      if(e.heroEkstra){
+        const vindDel = vind != null ? heroEkstraDel('💨', `${vind.toFixed(1)} m/s`) : '';
+        const vaerDel = naa.weather_code != null ? heroEkstraDel(vaerSymbol(naa.weather_code), vaerTekst(naa.weather_code)) : '';
+        const terrengDel = heroEkstraDel(terrengVaat ? '💧' : '🟢', terrengVaat ? 'Vått i terrenget' : 'Tørt i terrenget');
+        e.heroEkstra.innerHTML = vindDel + vaerDel + terrengDel;
+      }
+
+      oppdaterStatuslys(e, temp, null, kat, { regner: regnerNaa, vindHoyde: vind, terrengVaat });
+      byggDagsvarsel(e, lagDagerMTB(data.daily), kat);
+
+      e.oppdatert.textContent = 'oppdatert ' + new Date().toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'});
+      e.feilboks.classList.add('skjult');
+
+    }catch(err){
+      console.error('Feil (mtb):', err);
+      visFeil(e, kat);
+    }
+  }
+
+  function hentAlt(){
+    KATEGORIER.forEach(kat => {
+      if(kat.id === 'surfing') visSurfing(kat);
+      else if(kat.id === 'hikefly' || kat.id === 'paragliding' || kat.id === 'speedflying') visHikeFly(kat);
+      else if(kat.id === 'mtb') visMTB(kat);
+      else visVindsport(kat);
+    });
+  }
+
+  hentAlt();
+  setInterval(hentAlt, 10 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
